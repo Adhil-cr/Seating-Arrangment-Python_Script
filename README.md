@@ -1,158 +1,243 @@
-Seating Arrangement – Data Normalization & Algorithm Prototype
-Overview
+# Seating Arrangement – Data Normalization & Algorithm Prototype
 
-This repository is a prototype and testing ground for the Seating Arrangement Management System being developed as our final year college project.
+> A data preparation and validation module for automating college exam seating arrangements
 
-The purpose of this module is not to deliver the full application, but to:
--Analyze real exam registration data used in our college
--Normalize unsorted student–subject data into a system-friendly format
--Verify data integrity rigorously
--Lay the foundation for the seating arrangement algorithm
-This repository represents the algorithm design and data preparation phase of the main project.
+[![Python](https://img.shields.io/badge/Python-3.8+-blue.svg)](https://www.python.org/downloads/)
 
-Problem Statement :
+## About
 
-In our college, exam seating arrangements are prepared manually using raw exam registration data where:
--Each student appears once
--Multiple subject codes are stored across columns (Sub1, Sub2, …)
--Data is unsorted and not directly usable for automation
--However, automated seating arrangements require:
--One record per student per subject
--Clean, validated, and structured data
--Confidence that no student or subject is lost during processing
-This repository solves that exact problem.
+This prototype module transforms raw exam registration data into a clean, algorithm-ready format for automated seating arrangements. Developed as part of a final year college project, it focuses on **data normalization** and **integrity verification** before seating allocation.
 
-What This Repository Does
-1. Data Normalization
--Converts multi-subject-per-row CSV data into:
--One row = one student writing one subject
--Removes ambiguity caused by wide CSV formats
+**Key Goal:** Convert unsorted, multi-subject student records into a structured format where each row represents one student taking one subject—eliminating ambiguity and ensuring zero data loss.
 
-Produces data ready for:
--Seating allocation
--Constraint checks
--Hall distribution
+---
 
-2. Data Verification
--Verifies correctness using engineering-grade checks:
--Per-student subject count matching
--Student coverage validation
--Ensures zero data loss before algorithm execution
+## Problem Statement
 
-3. Algorithm Preparation
--Sorts normalized data by subject code
--Creates a reliable base for:
-    -Seating algorithms
-    -Constraint satisfaction logic
-    -Future database integration
+Manual exam seating arrangements at our college face these challenges:
 
-Project Structure
+**Current Data Format:**
+- One row per student with multiple subjects in columns (Sub1, Sub2, Sub3...)
+- Unsorted and not automation-friendly
+- Difficult to validate completeness
+
+**Required Format for Automation:**
+- One row per student per subject
+- Clean, validated, and structured
+- Sortable by subject code for hall allocation
+
+**This module bridges that gap.**
+
+---
+
+## Features
+
+### 1. **Data Normalization**
+- Converts wide-format CSV (multiple subjects per row) to long-format (one subject per row)
+- Dynamically detects subject columns
+- Sorts output by subject code for efficient processing
+
+### 2. **Data Verification**
+- **Per-student subject count matching:** Ensures each student's subjects are preserved
+- **Student coverage validation:** Confirms no students are lost during transformation
+- **Engineering-grade checks** before algorithm execution
+
+### 3. **Algorithm Preparation**
+- Produces seating-ready data for:
+  - Hall distribution algorithms
+  - Constraint satisfaction (department/semester separation)
+  - Future database integration
+
+---
+
+## Project Structure
+
+```
 seating_system/
 │
 ├── data_processing/
 │   ├── __init__.py
-│   ├── csv_normalizer.py        # Core normalization logic
-│   └── verify_normalization.py # Data integrity verification
+│   ├── csv_normalizer.py          # Core normalization logic
+│   └── verify_normalization.py    # Data integrity verification
 │
-├── Input_data/                 # Raw exam registration CSV (ignored by Git)
+├── Input_data/                    # Place raw CSV files here
+│   └── exam_registration.csv      # (gitignored)
 │
-├── output_data/                # Generated normalized CSV (ignored by Git)
+├── output_data/                   # Generated normalized CSV
+│   └── normalized_output.csv      # (gitignored)
 │
-├── venv/                       # Python virtual environment (ignored by Git)
-│
+├── venv/                          # Virtual environment (gitignored)
 ├── .gitignore
-└── README.md
+├── README.md
+└── requirements.txt
+```
 
-Scripts Explained
+---
 
-csv_normalizer.py
+## Installation
 
--Reads raw exam registration CSV
--Detects subject columns dynamically
--Normalizes data into one record per student per subject
--Sorts output by subject code
--Writes clean, seating-ready CSV
-This script represents the data preparation stage of the seating system.
+### Prerequisites
+- Python 3.8 or higher
+- pip (Python package manager)
 
-verify_normalization.py
+### Setup
 
--Verifies normalization correctness using:
--Per-student subject count comparison
--Student coverage checks
--Ensures output data is a faithful transformation of input data
-This script ensures algorithm safety before proceeding to seating logic.
+1. **Clone the repository**
+```bash
+git clone https://github.com/yourusername/seating-arrangement-prototype.git
+cd seating-arrangement-prototype
+```
 
-How This Fits into the Main Project
-This repository is a preparatory and experimental phase of the main Seating Arrangement Management System.
+2. **Create a virtual environment**
+```bash
+python -m venv venv
+```
 
-In the full project:
+3. **Activate the virtual environment**
 
-This logic will be integrated into the backend
+**Windows:**
+```bash
+venv\Scripts\activate
+```
 
-Normalized data will be stored in a database
+**macOS/Linux:**
+```bash
+source venv/bin/activate
+```
 
-Seating algorithms will:
+4. **Install dependencies**
+```bash
+pip install -r requirements.txt
+```
 
-Apply department and semester separation
+---
 
-Respect hall capacities
+## How to Run
 
-Assign invigilators
+### Step 1: Prepare Input Data
+Place your raw exam registration CSV file in the `Input_data/` folder. The CSV should have:
+- Student identification columns (e.g., Roll No, Name, Department)
+- Subject columns (e.g., Sub1, Sub2, Sub3, etc.)
 
-Generate seating charts and reports
+**Example input format:**
+```
+Roll No,Name,Department,Sub1,Sub2,Sub3
+101,John Doe,CSE,CS501,CS502,CS503
+102,Jane Smith,ECE,EC401,EC402,
+```
 
-Think of this repo as:
+### Step 2: Run Normalization
+```bash
+python data_processing/csv_normalizer.py
+```
 
-“The engine testing lab before building the full vehicle.”
+**What happens:**
+- Reads the CSV from `Input_data/`
+- Normalizes data (one student-subject pair per row)
+- Saves output to `output_data/normalized_output.csv`
+- Displays summary statistics
 
-Technologies Used
+### Step 3: Verify Data Integrity
+```bash
+python data_processing/verify_normalization.py
+```
 
-Python 3
+**What happens:**
+- Compares original and normalized data
+- Validates subject counts per student
+- Confirms zero data loss
+- Displays verification report
 
-Pandas
+### Expected Output
+```
+✓ Normalization successful
+✓ Total students: 150
+✓ Total subject entries: 450
+✓ Verification passed: All students accounted for
+```
 
-Git & GitHub
+---
 
-Why This Approach
+## Technologies Used
 
-Separates data engineering from application logic
+- **Python 3.8+** – Core programming language
+- **Pandas** – Data manipulation and CSV processing
+- **Git/GitHub** – Version control
 
-Prevents algorithm errors caused by dirty input
+---
 
-Makes the seating algorithm:
+## How This Fits the Main Project
 
-Simpler
+This repository is the **data engineering foundation** for the complete Seating Arrangement Management System.
 
-Safer
+**Current Phase (This Repo):**
+- ✅ Data normalization
+- ✅ Integrity verification
+- ✅ Algorithm-ready output
 
-Easier to explain in reviews and viva
+**Future Integration:**
+- Database storage (PostgreSQL/MySQL)
+- Seating allocation algorithm with constraints:
+  - Department/semester separation
+  - Hall capacity management
+  - Invigilator assignment
+- Web-based UI for exam cell administrators
+- PDF/Excel report generation
+- Full system deployment
 
-Academic Context
+> **Analogy:** This repo is the "engine testing lab" before building the full vehicle.
 
-This work is part of our Final Year College Project and focuses specifically on:
+---
 
-Algorithm design
+## Why This Approach?
 
-Data normalization
+1. **Separation of Concerns:** Data engineering is isolated from application logic
+2. **Algorithm Safety:** Clean input prevents downstream errors
+3. **Verifiable:** Engineering-grade checks ensure confidence
+4. **Academic Clarity:** Easier to explain during project reviews and viva
+5. **Scalable Foundation:** Designed for future database integration
 
-Validation strategies
+---
 
-Real-world exam data handling
+## Future Enhancements
 
-Future Work
+- [ ] Database schema design and migration
+- [ ] Constraint-based seating algorithm implementation
+- [ ] Hall capacity and room allocation logic
+- [ ] Invigilator assignment module
+- [ ] Web UI for exam cell operations
+- [ ] Automated report generation (PDF/Excel)
+- [ ] Deployment as a production-ready system
 
-Database schema design
+---
 
-Seating arrangement algorithm with constraints
+## Contributing
 
-Web-based UI for exam cell usage
+This is an academic project, but suggestions and feedback are welcome! Feel free to:
+- Open issues for bugs or improvements
+- Submit pull requests with enhancements
+- Share ideas for better algorithms
 
-PDF/Excel report generation
+---
 
-Deployment as a complete system
 
-Author
+## Author
 
-Adhil CR
-Final Year Student
+**Adhil CR**  
+Final Year Student  
 Seating Arrangement Management System – College Project
+
+📧 Contact: [m.adhilcr7@gmail.com)  
+🔗 GitHub: (https://github.com/Adhil-cr)
+
+---
+
+## Acknowledgments
+
+- College Exam Cell for providing real-world data requirements
+- Faculty advisors for project guidance
+- Open-source community for Python and Pandas
+
+---
+
+**⭐ If you find this helpful, please star the repository!**
