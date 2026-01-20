@@ -5,27 +5,30 @@ OUTPUT_FILE = "/home/adhil-cr/Desktop/Seating arrangment/seating_system/output_d
 
 print("Starting verification...\n")
 
-# Load data
 df_input = pd.read_csv(INPUT_FILE)
 df_output = pd.read_csv(OUTPUT_FILE)
 
 subject_columns = [c for c in df_input.columns if c.startswith("Sub")]
 
 # ----------------------------
-# 1.1 PER-STUDENT SUBJECT COUNT VERIFICATION
+# 1.1 AGGREGATED PER-STUDENT SUBJECT COUNT VERIFICATION
 # ----------------------------
-print("1.1 Verifying per-student subject counts...")
+print("1.1 Verifying aggregated per-student subject counts...")
 
 failed_students = []
 
-for _, row in df_input.iterrows():
-    reg_no = row["Register No"]
+# Group input rows by Register No
+for reg_no, group in df_input.groupby("Register No"):
 
-    input_subject_count = sum(
-        pd.notna(row[col]) and str(row[col]).strip() != ""
-        for col in subject_columns
-    )
+    # Count ALL valid subjects across ALL rows for this student
+    input_subject_count = 0
+    for _, row in group.iterrows():
+        input_subject_count += sum(
+            pd.notna(row[col]) and str(row[col]).strip() != ""
+            for col in subject_columns
+        )
 
+    # Count output rows for this student
     output_subject_count = len(
         df_output[df_output["register_no"] == reg_no]
     )
@@ -36,16 +39,16 @@ for _, row in df_input.iterrows():
         )
 
 if not failed_students:
-    print("✅ Per-student subject count verification PASSED\n")
+    print("✅ Aggregated per-student subject count verification PASSED\n")
 else:
-    print("❌ Per-student subject count verification FAILED")
-    print("Sample mismatches:")
+    print("❌ Aggregated per-student subject count verification FAILED")
+    print("Sample mismatches (Register No, input total, output total):")
     for item in failed_students[:10]:
         print(item)
-    print(f"Total mismatched students: {len(failed_students)}\n")
+    print(f"\nTotal mismatched students: {len(failed_students)}\n")
 
 # ----------------------------
-# 1.2 STUDENT COVERAGE
+# 1.2 STUDENT COVERAGE VERIFICATION
 # ----------------------------
 print("1.2 Verifying student coverage...")
 
