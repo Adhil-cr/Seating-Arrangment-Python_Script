@@ -59,13 +59,16 @@ def normalize_and_sort_csv(input_file_path: str, output_file_path: str) -> None:
                     "student_name": row["Student Name"],
                     "department": row["Branch"],
                     "semester": int(row["Semester"]),
-                    "subject_code": str(subject_code).strip()
+                    "subject_code": str(subject_code).strip().replace(".0", "")
                 })
 
     if not normalized_rows:
         raise ValueError("No valid subject registrations found.")
 
     normalized_df = pd.DataFrame(normalized_rows)
+
+    # FIX: enforce subject_code as string identifier
+    normalized_df["subject_code"] = normalized_df["subject_code"].astype(str).str.strip()
 
     print("Sorting by subject code...")
 

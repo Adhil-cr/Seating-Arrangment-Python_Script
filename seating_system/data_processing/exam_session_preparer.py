@@ -118,11 +118,14 @@ if __name__ == "__main__":
         "exam_date": "2026-03-10",
         "session": "FN",
         "subject_codes": [
-            "2001",
-            "4038",
-            "6000"
+            "2032",
+            "2022",
+            "4012",
+            "4036",
+            "6028",
+            "6002",
         ],
-        "number_of_halls": 20,
+        "number_of_halls": 40,
         "hall_capacity": 30,
         "invigilators_per_hall": 2
     }
