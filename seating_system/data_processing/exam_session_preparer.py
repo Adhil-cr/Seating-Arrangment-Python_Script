@@ -52,6 +52,14 @@ def prepare_exam_session(
     # ----------------------------
     session_df = df[df["subject_code"].isin(subject_codes)].copy()
 
+    missing_subjects = subject_codes - set(session_df["subject_code"].unique())
+
+    if missing_subjects:
+        raise ValueError(
+            f"Configured subject codes missing in prepared session: {missing_subjects}"
+        )
+
+
     if session_df.empty:
         raise ValueError("No students found for selected subject codes.")
 

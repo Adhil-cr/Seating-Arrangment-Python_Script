@@ -11,6 +11,7 @@ Purpose:
 
 import os
 import pandas as pd
+from data_processing.validators import validate_normalized_csv
 
 
 def normalize_and_sort_csv(input_file_path: str, output_file_path: str) -> None:
@@ -69,6 +70,8 @@ def normalize_and_sort_csv(input_file_path: str, output_file_path: str) -> None:
 
     # FIX: enforce subject_code as string identifier
     normalized_df["subject_code"] = normalized_df["subject_code"].astype(str).str.strip()
+
+    validate_normalized_csv(normalized_df)
 
     print("Sorting by subject code...")
 
