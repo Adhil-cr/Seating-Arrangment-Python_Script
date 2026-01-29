@@ -12,17 +12,6 @@ def allocate_seating(
     output_dir: str,
     seating_config: dict
 ) -> str:
-    """
-    Allocate seats to students based on hall capacity,
-    subject distribution limits, and bench-based in-hall reordering
-    (no same department on the same bench).
-
-    Pipeline:
-      1) Load prepared data
-      2) Allocate students to halls (existing logic, preserved)
-      3) Reorder seats within each hall by benches (NEW)
-      4) Assign seat numbers and export CSV
-    """
 
     # ----------------------------
     # Step 1: Load prepared data
@@ -40,6 +29,9 @@ def allocate_seating(
     if not required_cols.issubset(df.columns):
         raise ValueError("Prepared CSV schema mismatch.")
 
+    df["register_no"] = df["register_no"].astype(int)
+    df["subject_code"] = df["subject_code"].astype(str)
+
     # ----------------------------
     # Step 2: Read configuration
     # ----------------------------
@@ -48,34 +40,36 @@ def allocate_seating(
     max_subject_per_hall = seating_config["max_subject_per_hall"]
 
     if hall_capacity % 2 != 0:
-        raise ValueError("Hall capacity must be even (2 seats per bench).")
+        raise ValueError("Hall capacity must be even.")
 
     # ----------------------------
-    # Step 3: Allocate students to halls (UNCHANGED LOGIC)
+    # Step 3: Allocate students (HYBRID + SUBJECT SPREAD)
     # ----------------------------
-    halls = _allocate_students_to_halls(
-        df=df,
-        number_of_halls=number_of_halls,
-        hall_capacity=hall_capacity,
-        max_subject_per_hall=max_subject_per_hall
+    halls = _allocate_students_to_halls_hybrid(
+        df,
+        number_of_halls,
+        hall_capacity,
+        max_subject_per_hall
     )
 
     # ----------------------------
-    # Step 4: Reorder seats within each hall by benches (NEW)
+    # Step 4: Sort by department & register_no (FIX 1)
+    # ----------------------------
+    for hall in halls:
+        hall["seats"] = _sort_hall_seats_by_department_and_register(hall["seats"])
+
+    # ----------------------------
+    # Step 5: Bench reordering (FIX 1 continued)
     # ----------------------------
     for hall in halls:
         hall["seats"] = _reorder_hall_seats_by_bench(hall["seats"])
 
     # ----------------------------
-    # Step 5: Generate output rows with seat numbers
+    # Step 6: Generate output
     # ----------------------------
     output_rows = _generate_output_rows(halls)
-
     output_df = pd.DataFrame(output_rows)
 
-    # ----------------------------
-    # Step 6: Export CSV
-    # ----------------------------
     os.makedirs(output_dir, exist_ok=True)
     exam_date = df.iloc[0]["exam_date"]
     session = df.iloc[0]["session"]
@@ -88,152 +82,127 @@ def allocate_seating(
 
 
 # ============================================================
-# Internal Helpers
+# Allocation Logic (FIX 2)
 # ============================================================
 
-def _allocate_students_to_halls(
-    df: pd.DataFrame,
-    number_of_halls: int,
-    hall_capacity: int,
-    max_subject_per_hall: int
+def _allocate_students_to_halls_hybrid(
+    df,
+    number_of_halls,
+    hall_capacity,
+    max_subject_per_hall
 ):
-    """
-    Existing hall allocation logic (preserved).
-    Allocates students to halls respecting:
-      - hall capacity
-      - max students per subject per hall
-      - soft department mixing at hall level
-    """
-
     halls = []
-    for hall_id in range(1, number_of_halls + 1):
+    for hid in range(1, number_of_halls + 1):
         halls.append({
-            "hall_id": hall_id,
-            "capacity": hall_capacity,
+            "hall_id": hid,
             "occupied": 0,
             "subject_counts": defaultdict(int),
-            "department_counts": defaultdict(int),
             "seats": []
         })
 
-    # Group students by subject
+    # Group & sort students per subject
     subject_groups = defaultdict(list)
     for _, row in df.iterrows():
         subject_groups[row["subject_code"]].append(row)
 
-    # Sort subjects by descending size
-    sorted_subjects = sorted(
-        subject_groups.items(),
-        key=lambda x: len(x[1]),
-        reverse=True
-    )
+    for subject in subject_groups:
+        subject_groups[subject].sort(
+            key=lambda r: (r["department"], r["register_no"])
+        )
 
-    # Allocate
-    for subject_code, students in sorted_subjects:
-        for student in students:
-            allocated = False
+    subject_queues = {
+        s: deque(students)
+        for s, students in subject_groups.items()
+    }
 
-            halls_sorted = sorted(
-                halls,
-                key=lambda h: (
-                    h["subject_counts"][subject_code],
-                    h["department_counts"][student["department"]],
-                    h["occupied"]
-                )
-            )
+    hall_index = 0
 
-            for hall in halls_sorted:
-                if hall["occupied"] >= hall["capacity"]:
+    while any(subject_queues.values()):
+        for subject, queue in subject_queues.items():
+            if not queue:
+                continue
+
+            student = queue[0]
+            placed = False
+
+            for attempt in range(number_of_halls):
+                hall = halls[(hall_index + attempt) % number_of_halls]
+
+                if hall["occupied"] >= hall_capacity:
                     continue
-                if hall["subject_counts"][subject_code] >= max_subject_per_hall:
+
+                if hall["subject_counts"][subject] >= max_subject_per_hall:
                     continue
 
                 hall["seats"].append({
                     "register_no": student["register_no"],
                     "student_name": student["student_name"],
                     "department": student["department"],
-                    "subject_code": subject_code
+                    "subject_code": subject
                 })
-                hall["occupied"] += 1
-                hall["subject_counts"][subject_code] += 1
-                hall["department_counts"][student["department"]] += 1
 
-                allocated = True
+                hall["occupied"] += 1
+                hall["subject_counts"][subject] += 1
+                queue.popleft()
+
+                if hall["occupied"] >= hall_capacity:
+                    hall_index = (halls.index(hall) + 1) % number_of_halls
+
+                placed = True
                 break
 
-            if not allocated:
+            if not placed:
                 raise ValueError(
-                    f"Seating allocation failed for subject {subject_code}. "
-                    f"Constraints too strict."
+                    f"Cannot allocate subject {subject}; constraints too strict."
                 )
 
     return halls
 
 
+# ============================================================
+# Seating Helpers
+# ============================================================
+
+def _sort_hall_seats_by_department_and_register(seats):
+    return sorted(seats, key=lambda s: (s["department"], s["register_no"]))
+
+
 def _reorder_hall_seats_by_bench(seats):
-    """
-    Reorder seats so that no two students of the same department
-    sit on the same bench (2 seats per bench).
-
-    Best-effort strategy:
-      - Pair students from different departments per bench
-      - If only one department remains, fill sequentially
-    """
-
     if not seats:
         return seats
 
-    # Group seats by department into queues
     dept_queues = defaultdict(deque)
     for s in seats:
         dept_queues[s["department"]].append(s)
 
-    # Sort departments by remaining count (descending)
-    def sort_depts():
-        return sorted(
-            dept_queues.keys(),
-            key=lambda d: len(dept_queues[d]),
-            reverse=True
-        )
-
     reordered = []
 
-    while True:
-        # Remove empty departments
-        for d in list(dept_queues.keys()):
+    while dept_queues:
+        for d in list(dept_queues):
             if not dept_queues[d]:
                 del dept_queues[d]
 
         if not dept_queues:
             break
 
-        depts = sort_depts()
+        depts = sorted(dept_queues, key=lambda d: len(dept_queues[d]), reverse=True)
 
-        # If at least two departments available, pair them
         if len(depts) >= 2:
-            d1, d2 = depts[0], depts[1]
-            reordered.append(dept_queues[d1].popleft())
-            reordered.append(dept_queues[d2].popleft())
+            reordered.append(dept_queues[depts[0]].popleft())
+            reordered.append(dept_queues[depts[1]].popleft())
         else:
-            # Only one department left: best-effort fill
             d = depts[0]
             reordered.append(dept_queues[d].popleft())
             if dept_queues[d]:
                 reordered.append(dept_queues[d].popleft())
-            else:
-                break
 
     return reordered
 
 
 def _generate_output_rows(halls):
-    """
-    Assign seat numbers sequentially per hall
-    after in-hall reordering.
-    """
     rows = []
     for hall in halls:
-        seat_number = 1
+        seat_no = 1
         for seat in hall["seats"]:
             rows.append({
                 "register_no": seat["register_no"],
@@ -241,9 +210,9 @@ def _generate_output_rows(halls):
                 "department": seat["department"],
                 "subject_code": seat["subject_code"],
                 "hall_id": hall["hall_id"],
-                "seat_number": seat_number
+                "seat_number": seat_no
             })
-            seat_number += 1
+            seat_no += 1
     return rows
 
 
@@ -266,7 +235,7 @@ if __name__ == "__main__":
 
     seating_config = {
         "number_of_halls": 26,
-        "hall_capacity": 20,        # must be even
+        "hall_capacity": 20,
         "max_subject_per_hall": 12,
     }
 
